@@ -329,6 +329,8 @@ func checkFile(filename string) {
 }
 
 func saveMd5(file *os.File, downloadList map[string]int, md5 string) {
+	saveMd5Lock.Lock()
+	defer saveMd5Lock.Unlock()
 	downloadList[md5] = 1
 	_, _ = file.WriteString(md5 + ",")
 }
