@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	json2 "encoding/json"
+	"fmt"
 	"github.com/bitly/go-simplejson"
 	"io"
 	"log"
@@ -39,14 +40,16 @@ func main() {
 	checkFile(imageListFilename)
 	checkFile(downloadFilename)
 
+	fmt.Println("欢迎使用[程序员哈皮]的一刻相册下载工具。关注抖音、B站，有问题私信，看到都会解答")
+
 	bytes, err := os.ReadFile(cookieFilename)
 	if err != nil {
-		log.Fatalln("读取cookie文件异常", err)
+		logAndExist("读取cookie文件异常", err)
 	}
 
 	var cookie = string(bytes)
 	if len(cookie) == 0 {
-		log.Fatalln("请输入cookie至cookie.txt文件")
+		logAndExist("请输入cookie至cookie.txt文件")
 	}
 
 	log.Println("你的cookie:" + cookie)
@@ -65,7 +68,8 @@ func main() {
 		log.Println("目录已创建")
 	}
 
-	download_iamge(cookie, image_list)
+	downloadImage(cookie, image_list)
+	logAndExist("程序执行结束==============")
 }
 
 // 获取图片列表
@@ -84,22 +88,22 @@ func get_image_list(cookie string) []ImageItem {
 	for {
 		json, err := get_images(cursor, cookie)
 		if err != nil {
-			log.Fatalln("获取图片列表异常", err)
+			logAndExist("获取图片列表异常", err)
 		} else {
 			errno, err := json.Get("errno").Int()
 			if err != nil {
-				log.Fatalln("获取图片列表异常", err)
+				logAndExist("获取图片列表异常", err)
 			} else {
 				if errno != 0 {
 					// 失败了
-					log.Fatalln("获取图片列表异常", json)
+					logAndExist("获取图片列表异常", json)
 				} else {
 					// 成功了
 					// 判断是不是没有更多了
 
 					array, err := json.Get("list").Array()
 					if err != nil {
-						log.Fatalln("获取图片列表异常", json)
+						logAndExist("获取图片列表异常", json)
 					} else {
 						for _, data := range array {
 							if itemMap, ok := data.(map[string]interface{}); ok {
@@ -124,18 +128,18 @@ func get_image_list(cookie string) []ImageItem {
 					// 判断是不是还有更多
 					has_more, err := json.Get("has_more").Int()
 					if err != nil {
-						log.Fatalln("获取图片列表异常", json)
+						logAndExist("获取图片列表异常", json)
 					} else {
 						if has_more != 1 {
 							// 没有更多了
 							// 写入本地文件
 							bytes, err := json2.Marshal(image_list)
 							if err != nil {
-								log.Fatalln("获取图片列表异常", json)
+								logAndExist("获取图片列表异常", json)
 							} else {
 								err := os.WriteFile(imageListFilename, bytes, os.ModePerm)
 								if err != nil {
-									log.Fatalln("获取图片列表异常", json)
+									logAndExist("获取图片列表异常", json)
 								}
 								log.Println("没有更多图片了")
 								return image_list
@@ -144,7 +148,7 @@ func get_image_list(cookie string) []ImageItem {
 							// 还有更多图片
 							cursor, err = json.Get("cursor").String()
 							if err != nil {
-								log.Fatalln("获取图片列表异常", err)
+								logAndExist("获取图片列表异常", err)
 							}
 							log.Println("还有更多图片，继续获取")
 						}
@@ -183,7 +187,7 @@ func get_images(cursor, cookie string) (*simplejson.Json, error) {
 	return json, err
 }
 
-func download_iamge(cookie string, imageList []ImageItem) {
+func downloadImage(cookie string, imageList []ImageItem) {
 	bytes, _ := os.ReadFile(downloadFilename)
 	var downloadList = make(map[string]int)
 	if bytes != nil {
@@ -196,7 +200,7 @@ func download_iamge(cookie string, imageList []ImageItem) {
 
 	file, err := os.OpenFile(downloadFilename, os.O_APPEND|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		log.Fatalln("打开文件失败", err)
+		logAndExist("打开文件失败", err)
 	}
 
 	intChan := make(chan int, concurrence_size)
@@ -323,7 +327,7 @@ func checkFile(filename string) {
 		// 文件不存在，创建文件
 		_, err := os.Create(filename)
 		if err != nil {
-			log.Fatalln("文件创建失败", err)
+			logAndExist("文件创建失败", err)
 		}
 	}
 }
@@ -333,4 +337,11 @@ func saveMd5(file *os.File, downloadList map[string]int, md5 string) {
 	defer saveMd5Lock.Unlock()
 	downloadList[md5] = 1
 	_, _ = file.WriteString(md5 + ",")
+}
+
+func logAndExist(message ...any) {
+	log.Println(message)
+	fmt.Print("Press Enter to exit...")
+	_, _ = fmt.Scanln()
+	os.Exit(1)
 }
